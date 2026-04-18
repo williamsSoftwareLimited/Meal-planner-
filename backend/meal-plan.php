@@ -8,7 +8,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 
 $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 $mealSlots = ['breakfast', 'lunch', 'dinner', 'snacks'];
-$dataFile = __DIR__ . '/meal-plans.json';
+const DATA_FILE_NAME = 'meal-plans.json';
 const MEAL_TEXT_MAX_LENGTH = 120;
 
 function buildEmptyPlan(array $days, array $mealSlots): array
@@ -48,11 +48,28 @@ function setCorsHeaders(): void
     if (!is_string($origin) || trim($origin) === '') {
         return;
     }
+    $origin = trim($origin);
+    $originIsValidUrl = filter_var($origin, FILTER_VALIDATE_URL) !== false;
+    $originScheme = parse_url($origin, PHP_URL_SCHEME);
+    if (!$originIsValidUrl || !is_string($originScheme) || !in_array($originScheme, ['http', 'https'], true)) {
+        return;
+    }
 
     $rawAllowedOrigins = getenv('MEAL_PLANNER_ALLOWED_ORIGINS');
     $allowedOrigins = [];
     if (is_string($rawAllowedOrigins) && trim($rawAllowedOrigins) !== '') {
-        $allowedOrigins = array_map('trim', explode(',', $rawAllowedOrigins));
+        foreach (explode(',', $rawAllowedOrigins) as $allowedOrigin) {
+            $allowedOrigin = trim($allowedOrigin);
+            if ($allowedOrigin === '') {
+                continue;
+            }
+
+            $isValidUrl = filter_var($allowedOrigin, FILTER_VALIDATE_URL) !== false;
+            $scheme = parse_url($allowedOrigin, PHP_URL_SCHEME);
+            if ($isValidUrl && is_string($scheme) && in_array($scheme, ['http', 'https'], true)) {
+                $allowedOrigins[] = $allowedOrigin;
+            }
+        }
     } else {
         $allowedOrigins = [
             'http://localhost:8081',
@@ -66,6 +83,23 @@ function setCorsHeaders(): void
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Vary: Origin');
     }
+}
+
+function resolveDataFilePath(string $baseDirectory, string $fileName): ?string
+{
+    $safeBaseDirectory = realpath($baseDirectory);
+    if ($safeBaseDirectory === false) {
+        return null;
+    }
+
+    $cleanFileName = basename($fileName);
+    $candidatePath = $safeBaseDirectory . DIRECTORY_SEPARATOR . $cleanFileName;
+    $candidateDirectory = dirname($candidatePath);
+    if (strpos($candidateDirectory, $safeBaseDirectory) !== 0) {
+        return null;
+    }
+
+    return $candidatePath;
 }
 
 function loadAllPlans(string $dataFile): array
@@ -153,6 +187,10 @@ function normalizePlan(array $inputPlan, array $days, array $mealSlots): array
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 setCorsHeaders();
+$dataFile = resolveDataFilePath(__DIR__, DATA_FILE_NAME);
+if (!is_string($dataFile) || $dataFile === '') {
+    respond(500, ['error' => 'Invalid data file configuration']);
+}
 
 if ($method === 'OPTIONS') {
     http_response_code(204);
@@ -181,7 +219,7 @@ if ($method === 'POST') {
         respond(400, ['error' => 'Invalid JSON body']);
     }
 
-    $shopperId = $body['shopperId'] ?? 'default';
+    $shopperId = $_GET['shopperId'] ?? ($body['shopperId'] ?? 'default');
     if (!is_string($shopperId) || trim($shopperId) === '') {
         respond(400, ['error' => 'shopperId is required']);
     }

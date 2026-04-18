@@ -36,11 +36,11 @@ const getMealPlan = async (apiBaseUrl, shopperId) => {
 };
 
 const saveMealPlan = async (apiBaseUrl, shopperId, plan) => {
-  const endpoint = buildApiUrl(apiBaseUrl, 'backend/meal-plan.php');
+  const endpoint = buildApiUrl(apiBaseUrl, 'backend/meal-plan.php', { shopperId });
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ shopperId, plan }),
+    body: JSON.stringify({ plan }),
   });
 
   if (!response.ok) {

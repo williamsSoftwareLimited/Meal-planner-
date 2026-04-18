@@ -25,11 +25,10 @@ File: `backend/meal-plan.php`
 
 - `GET /backend/meal-plan.php?shopperId=default`
   - Returns the saved weekly plan for a shopper (or an empty template if not saved yet).
-- `POST /backend/meal-plan.php`
+- `POST /backend/meal-plan.php?shopperId=default`
   - Body:
     ```json
     {
-      "shopperId": "default",
       "plan": {
         "Monday": {
           "breakfast": "yoghurt, milk",
