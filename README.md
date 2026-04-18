@@ -56,4 +56,8 @@ The screen:
 - allows editing meal values for each day and meal slot
 - saves the whole Monday-Sunday plan back to the API
 
-Update `API_BASE_URL` in `mobile/WeeklyMealPlannerScreen.js` to your PHP host.
+Configure via props:
+- `apiBaseUrl` (default: `http://127.0.0.1:8000`)
+- `shopperId` (default: `default`)
+
+For browser-based clients, optionally set `MEAL_PLANNER_ALLOWED_ORIGINS` to a comma-separated allowlist of trusted origins.

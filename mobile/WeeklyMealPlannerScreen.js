@@ -1,8 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-const API_BASE_URL = 'http://127.0.0.1:8000';
-const SHOPPER_ID = 'default';
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner', 'snacks'];
 
@@ -15,8 +13,8 @@ const createEmptyPlan = () =>
     return daysAcc;
   }, {});
 
-const getMealPlan = async () => {
-  const response = await fetch(`${API_BASE_URL}/backend/meal-plan.php?shopperId=${encodeURIComponent(SHOPPER_ID)}`);
+const getMealPlan = async (apiBaseUrl, shopperId) => {
+  const response = await fetch(`${apiBaseUrl}/backend/meal-plan.php?shopperId=${encodeURIComponent(shopperId)}`);
   if (!response.ok) {
     throw new Error('Failed to load meal plan');
   }
@@ -25,11 +23,11 @@ const getMealPlan = async () => {
   return payload.plan || createEmptyPlan();
 };
 
-const saveMealPlan = async (plan) => {
-  const response = await fetch(`${API_BASE_URL}/backend/meal-plan.php`, {
+const saveMealPlan = async (apiBaseUrl, shopperId, plan) => {
+  const response = await fetch(`${apiBaseUrl}/backend/meal-plan.php`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ shopperId: SHOPPER_ID, plan }),
+    body: JSON.stringify({ shopperId, plan }),
   });
 
   if (!response.ok) {
@@ -37,14 +35,17 @@ const saveMealPlan = async (plan) => {
   }
 };
 
-export default function WeeklyMealPlannerScreen() {
+export default function WeeklyMealPlannerScreen({
+  apiBaseUrl = 'http://127.0.0.1:8000',
+  shopperId = 'default',
+}) {
   const [plan, setPlan] = useState(createEmptyPlan);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let mounted = true;
-    getMealPlan()
+    getMealPlan(apiBaseUrl, shopperId)
       .then((loadedPlan) => {
         if (mounted) {
           setPlan(loadedPlan);
@@ -62,9 +63,7 @@ export default function WeeklyMealPlannerScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
-
-  const rows = useMemo(() => DAYS, []);
+  }, [apiBaseUrl, shopperId]);
 
   const updateMeal = (day, slot, value) => {
     setPlan((current) => ({
@@ -79,7 +78,7 @@ export default function WeeklyMealPlannerScreen() {
   const onSave = async () => {
     try {
       setSaving(true);
-      await saveMealPlan(plan);
+      await saveMealPlan(apiBaseUrl, shopperId, plan);
       Alert.alert('Saved', 'Weekly meal plan saved');
     } catch {
       Alert.alert('Error', 'Could not save meal plan');
@@ -99,7 +98,7 @@ export default function WeeklyMealPlannerScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Weekly Meal Planner</Text>
-      {rows.map((day) => (
+      {DAYS.map((day) => (
         <View key={day} style={styles.dayCard}>
           <Text style={styles.dayTitle}>{day}</Text>
           {MEAL_SLOTS.map((slot) => (

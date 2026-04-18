@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 header('Content-Type: application/json');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
 
 $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 $mealSlots = ['breakfast', 'lunch', 'dinner', 'snacks'];
@@ -39,6 +41,32 @@ function respond(int $statusCode, array $payload): void
     exit;
 }
 
+function setCorsHeaders(): void
+{
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if (!is_string($origin) || trim($origin) === '') {
+        return;
+    }
+
+    $rawAllowedOrigins = getenv('MEAL_PLANNER_ALLOWED_ORIGINS');
+    $allowedOrigins = [];
+    if (is_string($rawAllowedOrigins) && trim($rawAllowedOrigins) !== '') {
+        $allowedOrigins = array_map('trim', explode(',', $rawAllowedOrigins));
+    } else {
+        $allowedOrigins = [
+            'http://localhost:8081',
+            'http://127.0.0.1:8081',
+            'http://localhost:19006',
+            'http://127.0.0.1:19006',
+        ];
+    }
+
+    if (in_array($origin, $allowedOrigins, true)) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Vary: Origin');
+    }
+}
+
 function loadAllPlans(string $dataFile): array
 {
     if (!file_exists($dataFile)) {
@@ -54,14 +82,44 @@ function loadAllPlans(string $dataFile): array
     return is_array($decoded) ? $decoded : [];
 }
 
-function saveAllPlans(string $dataFile, array $allPlans): bool
+function upsertPlan(string $dataFile, string $shopperId, array $plan): bool
 {
-    $json = json_encode($allPlans, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    if ($json === false) {
+    $handle = fopen($dataFile, 'c+');
+    if ($handle === false) {
         return false;
     }
 
-    return file_put_contents($dataFile, $json, LOCK_EX) !== false;
+    if (!flock($handle, LOCK_EX)) {
+        fclose($handle);
+        return false;
+    }
+
+    rewind($handle);
+    $existingJson = stream_get_contents($handle);
+    $allPlans = [];
+    if (is_string($existingJson) && trim($existingJson) !== '') {
+        $decoded = json_decode($existingJson, true);
+        if (is_array($decoded)) {
+            $allPlans = $decoded;
+        }
+    }
+
+    $allPlans[$shopperId] = $plan;
+    $json = json_encode($allPlans, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        return false;
+    }
+
+    ftruncate($handle, 0);
+    rewind($handle);
+    $bytesWritten = fwrite($handle, $json);
+    fflush($handle);
+    flock($handle, LOCK_UN);
+    fclose($handle);
+
+    return $bytesWritten !== false;
 }
 
 function normalizePlan(array $inputPlan, array $days, array $mealSlots): array
@@ -93,6 +151,12 @@ function normalizePlan(array $inputPlan, array $days, array $mealSlots): array
 }
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+setCorsHeaders();
+
+if ($method === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
 
 if ($method === 'GET') {
     $shopperId = $_GET['shopperId'] ?? 'default';
@@ -129,10 +193,7 @@ if ($method === 'POST') {
     $shopperId = trim($shopperId);
     $normalizedPlan = normalizePlan($rawPlan, $days, $mealSlots);
 
-    $allPlans = loadAllPlans($dataFile);
-    $allPlans[$shopperId] = $normalizedPlan;
-
-    if (!saveAllPlans($dataFile, $allPlans)) {
+    if (!upsertPlan($dataFile, $shopperId, $normalizedPlan)) {
         respond(500, ['error' => 'Unable to save meal plan']);
     }
 
