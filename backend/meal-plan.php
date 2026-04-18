@@ -9,6 +9,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 $mealSlots = ['breakfast', 'lunch', 'dinner', 'snacks'];
 $dataFile = __DIR__ . '/meal-plans.json';
+const MEAL_TEXT_MAX_LENGTH = 120;
 
 function buildEmptyPlan(array $days, array $mealSlots): array
 {
@@ -139,8 +140,8 @@ function normalizePlan(array $inputPlan, array $days, array $mealSlots): array
             }
 
             $value = trim($value);
-            if (strlen($value) > 120) {
-                $value = substr($value, 0, 120);
+            if (strlen($value) > MEAL_TEXT_MAX_LENGTH) {
+                $value = substr($value, 0, MEAL_TEXT_MAX_LENGTH);
             }
 
             $plan[$day][$slot] = $value;

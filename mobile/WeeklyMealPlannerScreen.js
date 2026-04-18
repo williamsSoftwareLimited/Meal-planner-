@@ -3,6 +3,8 @@ import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner', 'snacks'];
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8000';
+const DEFAULT_SHOPPER_ID = 'default';
 
 const createEmptyPlan = () =>
   DAYS.reduce((daysAcc, day) => {
@@ -13,8 +15,18 @@ const createEmptyPlan = () =>
     return daysAcc;
   }, {});
 
+const buildApiUrl = (apiBaseUrl, endpointPath, queryParams = {}) => {
+  const normalizedBaseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl : `${apiBaseUrl}/`;
+  const url = new URL(endpointPath.replace(/^\/+/, ''), normalizedBaseUrl);
+  Object.entries(queryParams).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
+  return url.toString();
+};
+
 const getMealPlan = async (apiBaseUrl, shopperId) => {
-  const response = await fetch(`${apiBaseUrl}/backend/meal-plan.php?shopperId=${encodeURIComponent(shopperId)}`);
+  const endpoint = buildApiUrl(apiBaseUrl, 'backend/meal-plan.php', { shopperId });
+  const response = await fetch(endpoint);
   if (!response.ok) {
     throw new Error('Failed to load meal plan');
   }
@@ -24,7 +36,8 @@ const getMealPlan = async (apiBaseUrl, shopperId) => {
 };
 
 const saveMealPlan = async (apiBaseUrl, shopperId, plan) => {
-  const response = await fetch(`${apiBaseUrl}/backend/meal-plan.php`, {
+  const endpoint = buildApiUrl(apiBaseUrl, 'backend/meal-plan.php');
+  const response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ shopperId, plan }),
@@ -36,8 +49,8 @@ const saveMealPlan = async (apiBaseUrl, shopperId, plan) => {
 };
 
 export default function WeeklyMealPlannerScreen({
-  apiBaseUrl = 'http://127.0.0.1:8000',
-  shopperId = 'default',
+  apiBaseUrl = DEFAULT_API_BASE_URL,
+  shopperId = DEFAULT_SHOPPER_ID,
 }) {
   const [plan, setPlan] = useState(createEmptyPlan);
   const [loading, setLoading] = useState(true);
