@@ -71,12 +71,15 @@ function setCorsHeaders(): void
             }
         }
     } else {
-        $allowedOrigins = [
-            'http://localhost:8081',
-            'http://127.0.0.1:8081',
-            'http://localhost:19006',
-            'http://127.0.0.1:19006',
-        ];
+        $appEnv = getenv('APP_ENV');
+        if (!is_string($appEnv) || strtolower($appEnv) !== 'production') {
+            $allowedOrigins = [
+                'http://localhost:8081',
+                'http://127.0.0.1:8081',
+                'http://localhost:19006',
+                'http://127.0.0.1:19006',
+            ];
+        }
     }
 
     if (in_array($origin, $allowedOrigins, true)) {
@@ -94,8 +97,8 @@ function resolveDataFilePath(string $baseDirectory, string $fileName): ?string
 
     $cleanFileName = basename($fileName);
     $candidatePath = $safeBaseDirectory . DIRECTORY_SEPARATOR . $cleanFileName;
-    $candidateDirectory = dirname($candidatePath);
-    if (strpos($candidateDirectory, $safeBaseDirectory) !== 0) {
+    $candidateDirectory = realpath(dirname($candidatePath));
+    if ($candidateDirectory === false || !str_starts_with($candidateDirectory, $safeBaseDirectory)) {
         return null;
     }
 
